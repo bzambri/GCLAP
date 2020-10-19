@@ -5,6 +5,7 @@ from pyspark.sql import functions
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from writeTable import writeTable
+from zonalMean import zonal_mean
 import xarray as xr
 import numpy as np
 import datetime
@@ -52,10 +53,13 @@ for yr in range(1979,2020):
         #repartition so the chunks are small enought to write
         df = df.repartition(3000)
 
+        #compute the zonal mean
+        zm = zonal_mean(df)     
+
         #write to CockroachDB; create table if it's the first month
         if yr == 1979 and mon == 1:
-            writeTable(df, 'single_level')
+            writeTable(zm, 'zonal_means')
         else:
-            writeTable(df, 'single_level', "append")
+            writeTable(zm, 'zonal_means', "append")
 
 spark.stop()

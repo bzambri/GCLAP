@@ -12,8 +12,3 @@ Scripts in this directory are not meant to be run, but contain individual comman
 
 #### `cockroachDB-start.sh` 
 [[Details](https://github.com/bzambri/GCLAP/wiki/Setting-up:-CockroachDB)] Instructions for starting the CockroachDB cluster.
-
-
-#### `flask.sh` 
-[[Details](https://github.com/bzambri/GCLAP/wiki/Setting-Up:-Flask)] Instructions for setting up Apache web server and Flask connection to CockroachDB
-

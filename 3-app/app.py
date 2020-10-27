@@ -6,18 +6,22 @@ import xarray as xr
 import plotly
 import chart_studio.plotly as py
 from plotly.graph_objs import *
+import plotly.graph_objects as go
 import numpy as np           
 from scipy.io import netcdf  
 from mpl_toolkits.basemap import Basemap
 
-f_path = 'total_precipitation_1979-01.nc'#your file from the NCEP reanalysis plotter
+f_path = 'Jan_diff.nc' #your file from the NCEP reanalysis plotter
+#f_path = 'compday.uD1lrjCi2B.nc'
 
 # Retrieve data from NetCDF file
 with netcdf.netcdf_file(f_path, 'r') as f:
     lon = f.variables['longitude'][::]     # copy as list
     lat = f.variables['latitude'][::-1]    # invert the latitude vector -> South to North
+ 
     tp = f.variables['tp'][0,::-1,:]       # squeeze out the time dimension, 
-                                           # invert latitude index
+                                           	     # invert latitude index
+    ts = f.variables['t2m'][0,::-1,:]
 
 # Shift 'lon' from [0,360] to [-180,180], make numpy array
 tmp_lon = np.array([lon[n]-360 if l>=180 else lon[n] 
@@ -30,18 +34,19 @@ lon = np.hstack((tmp_lon[i_west], tmp_lon[i_east]))  # stack the 2 halves
 # Correspondingly, shift the 'precip' array
 tp_ground = np.array(tp)
 tp = np.hstack((tp_ground[:,i_west], tp_ground[:,i_east]))
-#tp = (1000/30)*tp
-print(np.amax(tp))
-print(np.amin(tp))
+tp = (1000/30)*tp
+
+ts_ground = np.array(ts)
+ts = np.hstack((ts_ground[:,i_west], ts_ground[:,i_east]))
 
 trace1 = Contour(
-    z=(tp,
+    z=tp,
     x=lon,
     y=lat,
     colorscale= [[0.0, '#543005'], [0.07692307692307693, '#7f4909'], [0.15384615384615385, '#a76a1d'], [0.23076923076923078, '#c99545'], [0.3076923076923077, '#e1c582'], [0.38461538461538464, '#f2e2b8'], [0.46153846153846156, '#f6f0e2'], [0.5384615384615384, '#e4f1ef'], [0.6153846153846154, '#bce6e0'], [0.6923076923076923, '#86cfc4'], [0.7692307692307693, '#4ea79e'], [0.8461538461538461, '#218078'], [0.9230769230769231, '#015c53'], [1.0, '#003c30']],
     zauto=False,  # custom contour levels
-    zmin=0,      # first contour level
-    zmax=3,        # last contour level  => colorscale is centered about 0
+    zmin=-1,      # first contour level
+    zmax=1,        # last contour level  => colorscale is centered about 0
     
 colorbar= {
     "borderwidth": 0, 
@@ -51,12 +56,37 @@ colorbar= {
     "title": "mm/day"}, #gives your legend some units                                                                     
 
 contours= {
-    "end": 2.5, 
+    "end": 1,
     "showlines": False, 
-    "size": 0.25, #this is your contour interval
-    "start": 0}
+    "size": 0.05, #this is your contour interval
+    "start": -1}
 
-)    
+)
+
+trace2 = Contour(
+    z=ts,
+    x=lon,
+    y=lat,
+    colorscale= [[0.0, '#171c42'], [0.07692307692307693, '#263583'], [0.15384615384615385, '#1a58af'], [0.23076923076923078, '#1a7ebd'], [0.3076923076923077, '#619fbc'], [0.38461538461538464, '#9ebdc8'], [0.46153846153846156, '#d2d8dc'], [0.5384615384615384, '#e6d2cf'], [0.6153846153846154, '#daa998'], [0.6923076923076923, '#cc7b60'], [0.7692307692307693, '#b94d36'], [0.8461538461538461, '#9d2127'], [0.9230769230769231, '#6e0e24'], [1.0, '#3c0911']],
+    zauto=False,  # custom contour levels
+    zmin=-1,      # first contour level
+    zmax=1,        # last contour level  => colorscale is centered about 0
+    
+colorbar= {
+    "borderwidth": 0, 
+    "outlinewidth": 0, 
+    "thickness": 15, 
+    "tickfont": {"size": 14}, 
+    "title": "K"}, #gives your legend some units                                                                     
+
+contours= {
+    "end": 1,
+    "showlines": False, 
+    "size": 0.05, #this is your contour interval
+    "start": -1}
+
+)
+    
 # Make shortcut to Basemap object, 
 # not specifying projection type for this example
 m = Basemap() 
@@ -121,7 +151,7 @@ def get_country_traces():
 
 # Get list of of coastline, country, and state lon/lat traces
 traces_cc = get_coastline_traces()+get_country_traces()
-data = Data([trace1]+traces_cc)
+data = Data([trace1, trace2]+traces_cc)
 
 title = u"Total precipitation<br>Jan 1979"
 
@@ -163,11 +193,40 @@ layout = Layout(
     width=1200,
     height=800,
 )
-fig = Figure(data=data, layout=layout)
+#fig = Figure(data=data, layout=layout)
+
+fig = go.Figure()
+fig.add_trace(trace1)
+fig.add_trace(trace2)
+
+# Add Buttons
+fig.update_layout(
+    updatemenus=[
+        dict(
+            type="buttons",
+            direction="right",
+            active=0,
+            x=0.57,
+            y=1.2,
+            buttons=list([
+                dict(label="tp",
+                     method="update",
+                     args=[{"visible": [True, False]},
+                           {"title": "total_precipitation",
+                            "annotations": []}]),
+                dict(label="t2m",
+                     method="update",
+                     args=[{"visible": [False, True]},
+                           {"title": "2m temperature",
+                            "annotations": []}]),
+            ]),
+        )
+    ])
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+server = app.server
 
 app.layout = html.Div(children=[
     html.H1(children='Hello Dash'),
@@ -182,10 +241,9 @@ app.layout = html.Div(children=[
     )
 ])
 
+#outward-facing dashboard
 if __name__ == '__main__':
     app.run_server(debug=True,host='0.0.0.0')
-
-#py.iplot(fig, filename="ERA5 total precipitation", width=1000)
 
  
 

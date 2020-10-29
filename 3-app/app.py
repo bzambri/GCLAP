@@ -1,6 +1,7 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+from dash.dependencies import Input, Output
 import pandas as pd
 import xarray as xr
 import plotly
@@ -11,17 +12,27 @@ import numpy as np
 from scipy.io import netcdf  
 from mpl_toolkits.basemap import Basemap
 
-f_path = 'Jan_diff.nc' #your file from the NCEP reanalysis plotter
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+end = {"u10":3,"v10":3,"d2m":3,"t2m":3,"msl":500,"sst":2,"sp":500,"tp":10}
+interval = {"u10":0.5,"v10":0.5,"d2m":0.5,"t2m":0.5,"msl":100,"sst":0.25,"sp":100,"tp":1}
+units = {"u10":"m/s","v10":"m/s","d2m":"K","t2m":"K","msl":"Pa","sst":"K","sp":"Pa","tp":"mm"}
+
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+server = app.server
+
+f_path = 'single-level.nc' #your file from the NCEP reanalysis plotter
 #f_path = 'compday.uD1lrjCi2B.nc'
 
 # Retrieve data from NetCDF file
-with netcdf.netcdf_file(f_path, 'r') as f:
-    lon = f.variables['longitude'][::]     # copy as list
-    lat = f.variables['latitude'][::-1]    # invert the latitude vector -> South to North
- 
-    tp = f.variables['tp'][0,::-1,:]       # squeeze out the time dimension, 
-                                           	     # invert latitude index
-    ts = f.variables['t2m'][0,::-1,:]
+f = netcdf.netcdf_file(f_path, 'r')
+    
+lon = f.variables['longitude'][::]    # copy as list
+lat = f.variables['latitude'][::-1]    # invert the latitude vector -> South to North
+time = f.variables['time'][::]
+
+months = ["January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December", "Annual"]
 
 # Shift 'lon' from [0,360] to [-180,180], make numpy array
 tmp_lon = np.array([lon[n]-360 if l>=180 else lon[n] 
@@ -31,62 +42,14 @@ i_east, = np.where(tmp_lon>=0)  # indices of east lon
 i_west, = np.where(tmp_lon<0)   # indices of west lon
 lon = np.hstack((tmp_lon[i_west], tmp_lon[i_east]))  # stack the 2 halves
 
-# Correspondingly, shift the 'precip' array
-tp_ground = np.array(tp)
-tp = np.hstack((tp_ground[:,i_west], tp_ground[:,i_east]))
-tp = (1000/30)*tp
+#pop the dimension variables
+f.variables.pop('longitude')
+f.variables.pop('latitude')
+f.variables.pop('time')
 
-ts_ground = np.array(ts)
-ts = np.hstack((ts_ground[:,i_west], ts_ground[:,i_east]))
+#get what's left over
+available_indicators = f.variables.keys()
 
-trace1 = Contour(
-    z=tp,
-    x=lon,
-    y=lat,
-    colorscale= [[0.0, '#543005'], [0.07692307692307693, '#7f4909'], [0.15384615384615385, '#a76a1d'], [0.23076923076923078, '#c99545'], [0.3076923076923077, '#e1c582'], [0.38461538461538464, '#f2e2b8'], [0.46153846153846156, '#f6f0e2'], [0.5384615384615384, '#e4f1ef'], [0.6153846153846154, '#bce6e0'], [0.6923076923076923, '#86cfc4'], [0.7692307692307693, '#4ea79e'], [0.8461538461538461, '#218078'], [0.9230769230769231, '#015c53'], [1.0, '#003c30']],
-    zauto=False,  # custom contour levels
-    zmin=-1,      # first contour level
-    zmax=1,        # last contour level  => colorscale is centered about 0
-    
-colorbar= {
-    "borderwidth": 0, 
-    "outlinewidth": 0, 
-    "thickness": 15, 
-    "tickfont": {"size": 14}, 
-    "title": "mm/day"}, #gives your legend some units                                                                     
-
-contours= {
-    "end": 1,
-    "showlines": False, 
-    "size": 0.05, #this is your contour interval
-    "start": -1}
-
-)
-
-trace2 = Contour(
-    z=ts,
-    x=lon,
-    y=lat,
-    colorscale= [[0.0, '#171c42'], [0.07692307692307693, '#263583'], [0.15384615384615385, '#1a58af'], [0.23076923076923078, '#1a7ebd'], [0.3076923076923077, '#619fbc'], [0.38461538461538464, '#9ebdc8'], [0.46153846153846156, '#d2d8dc'], [0.5384615384615384, '#e6d2cf'], [0.6153846153846154, '#daa998'], [0.6923076923076923, '#cc7b60'], [0.7692307692307693, '#b94d36'], [0.8461538461538461, '#9d2127'], [0.9230769230769231, '#6e0e24'], [1.0, '#3c0911']],
-    zauto=False,  # custom contour levels
-    zmin=-1,      # first contour level
-    zmax=1,        # last contour level  => colorscale is centered about 0
-    
-colorbar= {
-    "borderwidth": 0, 
-    "outlinewidth": 0, 
-    "thickness": 15, 
-    "tickfont": {"size": 14}, 
-    "title": "K"}, #gives your legend some units                                                                     
-
-contours= {
-    "end": 1,
-    "showlines": False, 
-    "size": 0.05, #this is your contour interval
-    "start": -1}
-
-)
-    
 # Make shortcut to Basemap object, 
 # not specifying projection type for this example
 m = Basemap() 
@@ -151,96 +114,231 @@ def get_country_traces():
 
 # Get list of of coastline, country, and state lon/lat traces
 traces_cc = get_coastline_traces()+get_country_traces()
-data = Data([trace1, trace2]+traces_cc)
 
-title = u"Total precipitation<br>Jan 1979"
 
-#anno_text = "Data courtesy of \
-#<a href='http://www.esrl.noaa.gov/psd/data/composites/day/'>\
-#NOAA Earth System Research Laboratory</a>"
+#app.layout = html.Div(children=[
+#    html.H1(children='Global Climate data Lake and Analysis Platform (GCLAP)'),
 
-axis_style = dict(
-    zeroline=False,
-    showline=False,
-    showgrid=False,
-    ticks='',
-    showticklabels=False,
-)
+#    dcc.Graph(
+#        id='map',
+#        figure=fig
+#    )
+#])
+app.layout = html.Div([html.H1(children='Global Climate data Lake and Analysis Platform (GCLAP)'),
+    html.Div([
 
-layout = Layout(
-    title=title,
-    showlegend=False,
-    hovermode="closest",        # highlight closest point on hover
-    xaxis=XAxis(
-        axis_style,
-        range=[lon[0],lon[-1]]  # restrict y-axis to range of lon
-    ),
-    yaxis=YAxis(
-        axis_style,
-    ),
-#    annotations=Annotations([
-#        Annotation(
-#            text=anno_text,
-#            xref='paper',
-#            yref='paper',
-#            x=0,
-#            y=1,
-#            yanchor='bottom',
-#            showarrow=False
-#        )
- #   ]),
-    autosize=False,
-    width=1200,
-    height=800,
-)
-#fig = Figure(data=data, layout=layout)
+        html.Div([
+            dcc.Dropdown(
+                id='variable',
+                options=[{'label': i, 'value': i} for i in available_indicators],
+                value='t2m'
+            )
+        ],
+        style={'width': '20%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Dropdown(
+                id='month',
+                options=[{'label': months[i], 'value': i} for i in range(len(months))],
+                value=0
+            )
+        ],
+        style={'width': '20%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Dropdown(
+                id='year1',
+                options=[{'label': i, 'value': i} for i in range(1979,2020)],
+                value=1979
+            )
+        ],
+        style={'width': '10%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Dropdown(
+                id='year2',
+                options=[{'label': i, 'value': i} for i in range(1979,2020)],
+                value=1979
+            )
+        ],
+        style={'width': '10%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Dropdown(
+                id='year3',
+                options=[{'label': i, 'value': i} for i in range(1979,2020)],
+                value=1979
+            )
+        ],
+        style={'width': '10%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Dropdown(
+                id='year4',
+                options=[{'label': i, 'value': i} for i in range(1979,2020)],
+                value=1979
+            )
+        ],
+        style={'width': '10%', 'display': 'inline-block'})
 
-fig = go.Figure()
-fig.add_trace(trace1)
-fig.add_trace(trace2)
+    ]),
 
+    dcc.Graph(id='indicator-graphic')
+])
+
+@app.callback(
+    Output('indicator-graphic', 'figure'),
+    [Input('variable', 'value'),
+     Input('month', 'value'),
+     Input('year1', 'value'),
+     Input('year2', 'value'),
+     Input('year3', 'value'),
+     Input('year4', 'value')])
+
+def update_graph(variable, month, year1, year2, year3, year4):
+
+    #get the right units
+    scale_factor = f.variables[variable].scale_factor
+    add_offset = f.variables[variable].add_offset
+
+    #monthly analysis
+#    if month != 12:
+    ts = f.variables[variable][12*(year1-1979)+month:12*(year2-1979)+month:12,::-1,:]
+    clim = f.variables[variable][12*(year3-1979)+month:12*(year4-1979)+month:12,::-1,:] #get the monthly climatology
+    #annual average
+#    else:
+#        ts = f.variables[variable][12*(year1-1979):12*(end_year-1979),::-1,:]
+#        clim = f.variables[variable][:,::-1,:] #get the monthly climatology    
+
+    # Take the time-mean and shift the variable array
+    ts_ground = np.mean(np.array(ts)*scale_factor + add_offset,axis=0)
+    ts_clim   = np.mean(np.array(clim)*scale_factor + add_offset,axis=0)
+    ts_ground = ts_ground - ts_clim
+    ts        = np.hstack((ts_ground[:,i_west], ts_ground[:,i_east]))
+
+    #convert precipitation to mm/day
+    if variable == 'tp':
+        ts = 1000*ts
+        scale = [[0.0, '#543005'], [0.07692307692307693, '#7f4909'], [0.15384615384615385, '#a76a1d'], [0.23076923076923078, '#c99545'], [0.3076923076923077, '#e1c582'], [0.38461538461538464, '#f2e2b8'], [0.46153846153846156, '#f6f0e2'], [0.5384615384615384, '#e4f1ef'], [0.6153846153846154, '#bce6e0'], [0.6923076923076923, '#86cfc4'], [0.7692307692307693, '#4ea79e'], [0.8461538461538461, '#218078'], [0.9230769230769231, '#015c53'], [1.0, '#003c30']]
+    else:
+        scale = [[0.0, '#171c42'], [0.07692307692307693, '#263583'], [0.15384615384615385, '#1a58af'], [0.23076923076923078, '#1a7ebd'], [0.3076923076923077, '#619fbc'], [0.38461538461538464, '#9ebdc8'], [0.46153846153846156, '#d2d8dc'], [0.5384615384615384, '#e6d2cf'], [0.6153846153846154, '#daa998'], [0.6923076923076923, '#cc7b60'], [0.7692307692307693, '#b94d36'], [0.8461538461538461, '#9d2127'], [0.9230769230769231, '#6e0e24'], [1.0, '#3c0911']]
+
+    trace1 = Contour(
+    z=ts,
+    x=lon,
+    y=lat,
+    colorscale = scale,
+    zauto=False,  # custom contour levels
+    zmin=-1*end[variable],      # first contour level
+    zmax=end[variable],        # last contour level  => colorscale is centered about 0
+    
+    colorbar= {
+        "borderwidth": 0, 
+        "outlinewidth": 0, 
+        "thickness": 15, 
+        "tickfont": {"size": 14}, 
+        "title": units[variable]}, #gives your legend some units                                                                     
+
+    contours= {
+        "end": end[variable],
+        "showlines": False, 
+        "size": interval[variable], #this is your contour interval
+        "start": -1*end[variable]}
+
+    )
+    data = Data([trace1]+traces_cc)
+    title = f"{months[month]} {variable} anomaly, {year1}-{year2} minus {year3}-{year4}"
+
+    axis_style = dict(
+        zeroline=False,
+        showline=False,
+        showgrid=False,
+        ticks='',
+        showticklabels=False,
+    )
+
+    layout = Layout(
+        title=title,
+        showlegend=False,
+        hovermode="closest",        # highlight closest point on hover
+        xaxis=XAxis(
+            axis_style,
+            range=[lon[0],lon[-1]]  # restrict y-axis to range of lon
+        ),
+        yaxis=YAxis(
+            axis_style,
+        ),
+        autosize=False,
+        width=1200,
+        height=800,
+    )
+    fig = Figure(data=data, layout=layout)
+
+    #fig = px.scatter(x=dff[dff['Indicator Name'] == xaxis_column_name]['Value'],
+    #                 y=dff[dff['Indicator Name'] == yaxis_column_name]['Value'],
+    #                 hover_name=dff[dff['Indicator Name'] == yaxis_column_name]['Country Name'])
+
+    #fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
+
+    #fig.update_xaxes(title=xaxis_column_name, 
+    #                 type='linear' if xaxis_type == 'Linear' else 'log') 
+
+    #fig.update_yaxes(title=yaxis_column_name, 
+    #                 type='linear' if yaxis_type == 'Linear' else 'log') 
+
+    return fig
+
+#fig = go.Figure(layout = go.Layout(
+#    title=title,
+#    showlegend=False,
+#    hovermode="closest",        # highlight closest point on hover
+#    xaxis=XAxis(
+#        axis_style,
+#        range=[lon[0],lon[-1]]  # restrict y-axis to range of lon
+#    ),
+#    yaxis=YAxis(
+#        axis_style,
+#    ),
+#    autosize=False,
+#    width=1200,
+#    height=800,
+#))
+
+#fig.add_trace(trace1)
+#fig.add_trace(trace4)
+#fig.add_trace(trace7)
+#fig.add_trace(trace10)
+
+"""
 # Add Buttons
-fig.update_layout(
+#fig.update_layout(
     updatemenus=[
         dict(
-            type="buttons",
-            direction="right",
+            type="dropdown",
+            direction="down",
             active=0,
             x=0.57,
             y=1.2,
             buttons=list([
-                dict(label="tp",
+                dict(label="DJF 2019",
                      method="update",
-                     args=[{"visible": [True, False]},
-                           {"title": "total_precipitation",
+                     args=[{"visible": [True, False, False, False, True, True]},
+                           {"title": "2m temperature anomaly, DJF 2019",
                             "annotations": []}]),
-                dict(label="t2m",
+                dict(label="MAM 2019",
                      method="update",
-                     args=[{"visible": [False, True]},
-                           {"title": "2m temperature",
+                     args=[{"visible": [False, True, False, False, True, True]},
+                           {"title": "2m temperature anomaly, MAM 2019",
+                            "annotations": []}]),
+                dict(label="JJA 2019",
+                     method="update",
+                     args=[{"visible": [False, False, True,  False, True, True]},
+                           {"title": "2m temperature anomaly, JJA 2019",
+                            "annotations": []}]),
+                dict(label="SON 2019",
+                     method="update",
+                     args=[{"visible": [False, False, False, True, True, True]},
+                           {"title": "2m temperature anomaly, SON 2019",
                             "annotations": []}]),
             ]),
         )
     ])
-
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-server = app.server
-
-app.layout = html.Div(children=[
-    html.H1(children='Hello Dash'),
-
-    html.Div(children='''
-        Dash: A web application framework for Python.
-    '''),
-
-    dcc.Graph(
-        id='example-graph',
-        figure=fig
-    )
-])
-
+"""
 #outward-facing dashboard
 if __name__ == '__main__':
     app.run_server(debug=True,host='0.0.0.0')

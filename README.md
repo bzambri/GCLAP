@@ -18,8 +18,8 @@ Here is an overview of the steps required to setup the cluster:
 2. Set up a CockroachDB cluster.
 3. Set up a Spark cluster for data processing.
 4. Calculate desired tables using Spark and save to CockroachDB.
-6. Set up a web server with Apache and UI with Superset.
-7. Set up Airflow to run the data pipeline and refresh the data and UI monthly.
+6. Set up a web server with Apache and UI with Plotly/Dash.
+7. Set up Airflow to run the data pipeline and refresh the data and UI monthly.*
 
 ## Architecture
 

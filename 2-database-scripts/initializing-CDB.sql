@@ -1,10 +1,10 @@
 -- creating database
-CREATE DATABASE fedspend;
+CREATE DATABASE single_levels;
+CREATE DATABASE zonal_means;
 
 -- creating users
-CREATE USER sanoke WITH PASSWORD '<your-password>';
-CREATE USER migrater WITH PASSWORD '<your-password>';
+CREATE USER brian WITH PASSWORD '<your-password>';
 
 -- granting permissions
-GRANT ALL ON DATABASE fedspend TO sanoke;
-GRANT ALL ON DATABASE fedspend TO migrater;
+GRANT ALL ON DATABASE single_levels TO brian;
+GRANT ALL ON DATABASE zonal_means TO brian;

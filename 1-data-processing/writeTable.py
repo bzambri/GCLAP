@@ -1,4 +1,4 @@
-#   HELPER FUNCTIONS AND OBJECTS FOR POSTGRESQL MIGRATION
+#   FUNCTION TO WRITE TO CDB
 
 from pyspark.sql import SparkSession 
 import sys
@@ -15,5 +15,5 @@ def writeTable(table0, tableName, saveMode="error"):
     .option("url", cluster) \
     .option("dbtable", tableName) \
     .option("user", "brian") \
-    .option("password", "cockroach") \
+    .option("password", "<your-password>") \
     .save(mode=saveMode)

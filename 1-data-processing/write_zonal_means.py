@@ -23,17 +23,14 @@ spark = SparkSession(sc)
 fs_s3 = s3fs.S3FileSystem()
 
 #define the table schema
-schema = StructType([StructField('latitude', DoubleType(), nullable=False),
-                     StructField('longitude', DoubleType(), nullable=False),
+schema = StructType([StructField('level', DoubleType(), nullable=False),
+                     StructField('latitude', DoubleType(), nullable=False),
                      StructField('date', DateType(), nullable=False),
-                     StructField('u10', DoubleType(), nullable=False),
-                     StructField('v10', DoubleType(), nullable=False),
-                     StructField('d2m', DoubleType(), nullable=False),
-                     StructField('t2m', DoubleType(), nullable=False),
-                     StructField('msl', DoubleType(), nullable=False),
-                     StructField('sst', DoubleType(), nullable=False),
-                     StructField('sp' , DoubleType(), nullable=False),
-                     StructField('tp' , DoubleType(), nullable=False)])
+                     StructField('u', DoubleType(), nullable=False),
+                     StructField('v', DoubleType(), nullable=False),
+                     StructField('t', DoubleType(), nullable=False),
+                     StructField('z', DoubleType(), nullable=False),
+                     StructField('o3', DoubleType(), nullable=False)])
 
 for yr in range(1979,2020):
     for mon in range(1,13):
@@ -47,7 +44,7 @@ for yr in range(1979,2020):
         pdf = xr.open_dataset(remote_file_obj, engine='h5netcdf').to_dataframe()
 
         #explode the table and convert to Spark df
-        data = pdf.reset_index(level=['latitude','longitude','time'])
+        data = pdf.reset_index(level=['level', 'latitude', 'longitude', 'time'])
         df = spark.createDataFrame(data, schema=schema)
 
         #repartition so the chunks are small enought to write

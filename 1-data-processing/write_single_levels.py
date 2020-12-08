@@ -15,7 +15,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 bucket = 'reanalysis-folders'
-key = 'ERA5/single-level'
+key = 'ERA5/single-levels'
 
 sc = SparkContext()
 spark = SparkSession(sc)
@@ -54,8 +54,8 @@ for yr in range(1979,2020):
 
         #write to CockroachDB; create table if it's the first month
         if yr == 1979 and mon == 1:
-            writeTable(df, 'single_level')
+            writeTable(df, 'single_levels')
         else:
-            writeTable(df, 'single_level', "append")
+            writeTable(df, 'single_levels', "append")
 
 spark.stop()

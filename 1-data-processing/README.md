@@ -4,7 +4,7 @@ This directory contains the pySpark scripts that were used to read the reanalysi
 
 `get_ERA5_pressure_levels.py` and `get_ERA5_single_levels.py` download the 2- and 3-dimensional ERA5 reanalysis data, respectively, and upload the files to S3.
 
-`writeTable.py` is the function used to write the data to CockroachDB.
+`tableFunctions.py` contains the functions used to read/write the data from/to CockroachDB.
 
 `write_single_levels.py` writes the raw monthly surface data (2-d; lat, lon) to CockroachDB.
 

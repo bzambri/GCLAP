@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
-from writeTable import writeTable
+from tableFunctions import writeTable
 import xarray as xr
 import numpy as np
 import datetime
